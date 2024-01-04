@@ -20,6 +20,22 @@ hubert_model = model_loader.load_hubert()
 rmvpe_model = RMVPE("rmvpe.pt", gpu_config.is_half, gpu_config.device)
 
 
+@app.get("/")
+def health_check():
+    try:
+        return {"message": "Server is running"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/model_weights")
+def get_models():
+    try:
+        return model_loader.model_list
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/load_model/{model_name}")
 async def load_model(model_name: str):
     try:
