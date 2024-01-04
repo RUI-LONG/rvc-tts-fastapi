@@ -25,6 +25,13 @@ class ModelLoader:
             raise ValueError("No model found in `weights` folder")
         self.model_list.sort()
 
+        self.tgt_sr = None
+        self.net_g = None
+        self.vc = None
+        self.version = None
+        self.index_file = None
+        self.if_f0 = None
+
     def load(self, model_name):
         pth_files = [
             os.path.join(self.model_root, model_name, f)
@@ -40,39 +47,39 @@ class ModelLoader:
         print(f"Loading {pth_path}")
 
         cpt = torch.load(pth_path, map_location="cpu")
-        tgt_sr = cpt["config"][-1]
+        self.tgt_sr = cpt["config"][-1]
         cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]  # n_spk
-        if_f0 = cpt.get("f0", 1)
-        version = cpt.get("version", "v1")
+        self.if_f0 = cpt.get("f0", 1)
+        self.version = cpt.get("version", "v1")
 
-        if version == "v1":
-            if if_f0 == 1:
-                net_g = SynthesizerTrnMs256NSFsid(
+        if self.version == "v1":
+            if self.if_f0 == 1:
+                self.net_g = SynthesizerTrnMs256NSFsid(
                     *cpt["config"], is_half=self.config.is_half
                 )
             else:
-                net_g = SynthesizerTrnMs256NSFsid_nono(*cpt["config"])
-        elif version == "v2":
-            if if_f0 == 1:
-                net_g = SynthesizerTrnMs768NSFsid(
+                self.net_g = SynthesizerTrnMs256NSFsid_nono(*cpt["config"])
+        elif self.version == "v2":
+            if self.if_f0 == 1:
+                self.net_g = SynthesizerTrnMs768NSFsid(
                     *cpt["config"], is_half=self.config.is_half
                 )
             else:
-                net_g = SynthesizerTrnMs768NSFsid_nono(*cpt["config"])
+                self.net_g = SynthesizerTrnMs768NSFsid_nono(*cpt["config"])
         else:
             raise ValueError("Unknown version")
 
-        del net_g.enc_q
-        net_g.load_state_dict(cpt["weight"], strict=False)
+        del self.net_g.enc_q
+        self.net_g.load_state_dict(cpt["weight"], strict=False)
         print("Model loaded")
-        net_g.eval().to(self.config.device)
+        self.net_g.eval().to(self.config.device)
 
         if self.config.is_half:
-            net_g = net_g.half()
+            self.net_g = self.net_g.half()
         else:
-            net_g = net_g.float()
+            self.net_g = self.net_g.float()
 
-        vc = VC(tgt_sr, self.config)
+        self.vc = VC(self.tgt_sr, self.config)
 
         index_files = [
             os.path.join(self.model_root, model_name, f)
@@ -82,19 +89,10 @@ class ModelLoader:
 
         if len(index_files) == 0:
             print("No index file found")
-            index_file = ""
+            self.index_file = ""
         else:
-            index_file = index_files[0]
-            print(f"Index file found: {index_file}")
-
-        return (
-            tgt_sr,
-            net_g,
-            vc,
-            version,
-            index_file,
-            if_f0,
-        )
+            self.index_file = index_files[0]
+            print(f"Index file found: {self.index_file}")
 
     def load_hubert(self):
         models, _, _ = checkpoint_utils.load_model_ensemble_and_task(

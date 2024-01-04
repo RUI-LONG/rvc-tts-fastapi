@@ -6,8 +6,12 @@ import os
 if __name__ == "__main__":
     api_url = ""
 
+    # Load Model (only first time)
+    model_name = "A"
+    requests.post(f"{api_url}/load_model/{model_name}")
+
+    # TTS
     json_data = {
-        "model_name": "A",
         "speed": 0,
         "tts_text": "我的同事凱文，是一隻猴子",
         "tts_voice": "zh-TW-HsiaoChenNeural-Female",

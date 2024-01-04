@@ -20,9 +20,17 @@ hubert_model = model_loader.load_hubert()
 rmvpe_model = RMVPE("rmvpe.pt", gpu_config.is_half, gpu_config.device)
 
 
+@app.post("/load_model/{model_name}")
+async def load_model(model_name: str):
+    try:
+        model_loader.load(model_name)
+        return {"message": "Loaded model successfully"}
+    except Exception as e:
+        return HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/tts")
 async def tts_api(request_data: dict):
-    model_name = request_data.get("model_name")
     speed = request_data.get("speed")
     tts_text = request_data.get("tts_text")
     tts_voice = request_data.get("tts_voice")
@@ -34,6 +42,18 @@ async def tts_api(request_data: dict):
     resample_sr = request_data.get("resample_sr", 0)
     rms_mix_rate = request_data.get("rms_mix_rate", 0.25)
 
+    tgt_sr, net_g, vc, version, index_file, if_f0 = (
+        model_loader.tgt_sr,
+        model_loader.net_g,
+        model_loader.vc,
+        model_loader.version,
+        model_loader.index_file,
+        model_loader.if_f0,
+    )
+    if not tgt_sr:
+        info = "Use load model API before tts."
+        raise HTTPException(status_code=400, detail=info)
+
     # temp file
     edge_output_filename = "edge_output.mp3"
     try:
@@ -42,15 +62,11 @@ async def tts_api(request_data: dict):
                 status_code=400,
                 detail=f"Text characters should be at most 280, but got {len(tts_text)} characters.",
             )
-
-        tgt_sr, net_g, vc, version, index_file, if_f0 = model_loader.load(
-            model_name
-        )
-
         if speed >= 0:
             speed_str = f"+{speed}%"
         else:
             speed_str = f"{speed}%"
+
         await edge_tts.Communicate(
             tts_text, "-".join(tts_voice.split("-")[:-1]), rate=speed_str
         ).save(edge_output_filename)
