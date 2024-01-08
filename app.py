@@ -1,4 +1,6 @@
-import time
+import os
+import shutil
+import hashlib
 import uvicorn
 import logging
 import traceback
@@ -58,6 +60,17 @@ async def tts_api(request_data: dict):
     resample_sr = request_data.get("resample_sr", 0)
     rms_mix_rate = request_data.get("rms_mix_rate", 0.25)
 
+    _hash_str = tts_text + str(speed) + str(tts_voice) + str(f0_up_key)
+    hash_file = f'{hashlib.md5(_hash_str.encode("utf-8")).hexdigest()}.wav'
+    file_folder = os.path.join(os.getcwd(), "audio")
+    file_path = os.path.join(file_folder, hash_file)
+
+    if os.path.exists(file_path):
+        return FileResponse(
+            file_path,
+            headers={f"Content-Disposition": "attachment; filename={hash_file}"},
+        )
+
     tgt_sr, net_g, vc, version, index_file, if_f0 = (
         model_loader.tgt_sr,
         model_loader.net_g,
@@ -89,10 +102,10 @@ async def tts_api(request_data: dict):
 
         audio, sr = librosa.load(edge_output_filename, sr=16000, mono=True)
         duration = len(audio) / sr
-        if duration >= 20:
+        if duration >= 80:
             raise HTTPException(
                 status_code=400,
-                detail=f"Audio should be less than 20 seconds, but got {duration}s.",
+                detail=f"Audio should be less than 80 seconds, but got {duration}s.",
             )
 
         f0_up_key = int(f0_up_key)
@@ -121,14 +134,15 @@ async def tts_api(request_data: dict):
             None,
         )
 
-        sf.write("output.wav", audio_opt, tgt_sr, format="WAV")
+        sf.write(hash_file, audio_opt, tgt_sr, format="WAV")
+        shutil.move(hash_file, file_folder)
 
         if tgt_sr != resample_sr >= 16000:
             tgt_sr = resample_sr
 
         return FileResponse(
-            "output.wav",
-            headers={"Content-Disposition": "attachment; filename=output.wav"},
+            file_path,
+            headers={f"Content-Disposition": "attachment; filename={hash_file}"},
         )
 
     except EOFError:

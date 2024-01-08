@@ -1,5 +1,6 @@
 import os
 import torch
+import logging
 from fairseq import checkpoint_utils
 
 from lib.infer_pack.models import (
@@ -10,6 +11,8 @@ from lib.infer_pack.models import (
 )
 from src.config import Config
 from src.vc_infer_pipeline import VC
+
+logging.getLogger("fairseq").setLevel(logging.WARNING)
 
 
 class ModelLoader:
