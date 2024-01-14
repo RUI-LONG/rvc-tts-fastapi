@@ -5,22 +5,21 @@ import os
 
 if __name__ == "__main__":
     api_url = ""
-
     # Load Model (only first time)
     model_name = "A"
     requests.post(f"{api_url}/load_model/{model_name}")
 
     # TTS
-    json_data = {
+    data = {
         "speed": 0,
         "tts_text": "我的同事凱文，是一隻猴子",
         "tts_voice": "zh-TW-HsiaoChenNeural-Female",
     }
 
-    response = requests.post(f"{api_url}/tts", json=json_data)
+    response = requests.post(f"{api_url}/tts", data=data)
 
     if response.status_code == 200:
-        wav_filename = "downloaded.wav"
+        wav_filename = f"downloaded.wav"
 
         with open(wav_filename, "wb") as wav_file:
             wav_file.write(response.content)
