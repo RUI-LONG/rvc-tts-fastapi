@@ -1,6 +1,8 @@
 import os
 import torch
 import logging
+import requests
+import zipfile
 from fairseq import checkpoint_utils
 
 from lib.infer_pack.models import (
@@ -26,6 +28,8 @@ class ModelLoader:
         ]
         if len(self.model_list) == 0:
             raise ValueError("No model found in `weights` folder")
+
+        self.model_name = ""
         self.model_list.sort()
 
         self.tgt_sr = None
@@ -35,7 +39,29 @@ class ModelLoader:
         self.index_file = None
         self.if_f0 = None
 
+    def _load_from_zip_url(self, url):
+        response = requests.get(url)
+        file_name = os.path.join(
+            self.model_root, os.path.basename(url[: url.index(".zip") + 4])
+        )
+        model_name = os.path.basename(file_name).replace(".zip", "")
+        print(f"Extraacting Model: {model_name}")
+
+        if response.status_code == 200:
+            with open(file_name, "wb") as file:
+                file.write(response.content)
+
+            with zipfile.ZipFile(file_name, "r") as zip_ref:
+                zip_ref.extractall(os.path.join(self.model_root, model_name))
+            os.remove(file_name)
+        else:
+            print("Could not download model: {model_name}")
+        return model_name
+
     def load(self, model_name):
+        if "http" in model_name:
+            model_name = self._load_from_zip_url(model_name)
+
         pth_files = [
             os.path.join(self.model_root, model_name, f)
             for f in os.listdir(os.path.join(self.model_root, model_name))
@@ -46,8 +72,9 @@ class ModelLoader:
                 f"No pth file found in {self.model_root}/{model_name}"
             )
 
+        self.model_name = model_name
         pth_path = pth_files[0]
-        print(f"Loading {pth_path}")
+        print(f"Loading {pth_path}, model: {model_name}")
 
         cpt = torch.load(pth_path, map_location="cpu")
         self.tgt_sr = cpt["config"][-1]

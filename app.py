@@ -38,7 +38,7 @@ def get_models():
         return {"error": str(e)}
 
 
-@app.post("/load_model/{model_name}")
+@app.post("/load_model/{model_name:path}")
 async def load_model(model_name: str):
     try:
         model_loader.load(model_name)
@@ -70,7 +70,7 @@ async def rvc_api(
         model_loader.index_file,
         model_loader.if_f0,
     )
-    if not tgt_sr:
+    if not tgt_sr or not model_loader.model_name:
         info = "Use load model API before rvc."
         raise HTTPException(status_code=400, detail=info)
 
@@ -140,14 +140,22 @@ async def tts_api(
     resample_sr: int = Form(0),
     rms_mix_rate: float = Form(0.25),
 ):
-    _hash_str = tts_text + str(speed) + str(tts_voice) + str(f0_up_key)
+    _hash_str = (
+        tts_text
+        + str(speed)
+        + str(tts_voice)
+        + str(f0_up_key)
+        + str(model_loader.model_name)
+    )
     hash_file = f'{hashlib.md5(_hash_str.encode("utf-8")).hexdigest()}.wav'
     file_path = os.path.join(os.getcwd(), "audio", hash_file)
 
     if os.path.exists(file_path):
         return FileResponse(
             file_path,
-            headers={f"Content-Disposition": "attachment; filename={hash_file}"},
+            headers={
+                f"Content-Disposition": "attachment; filename={hash_file}"
+            },
         )
 
     tgt_sr, net_g, vc, version, index_file, if_f0 = (
@@ -221,7 +229,9 @@ async def tts_api(
 
         return FileResponse(
             file_path,
-            headers={f"Content-Disposition": "attachment; filename={hash_file}"},
+            headers={
+                f"Content-Disposition": "attachment; filename={hash_file}"
+            },
         )
 
     except EOFError:
